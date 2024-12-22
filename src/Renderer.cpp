@@ -3,9 +3,12 @@
 #include "../imgui/imgui.h"
 #include "../include/MemoryManager.h"
 #include "../include/CGame.h"
+#include "../include/Entity.h"
 #include <d3d11.h>  // DirectX 11 header
 #include <windows.h>
 #include <string>
+#include <vector>
+#include <cmath>
 
 extern ID3D11Device* g_pd3dDevice;          // DirectX device
 extern ID3D11DeviceContext* g_pd3dContext; // DirectX device context
@@ -64,4 +67,32 @@ void Renderer::RenderText(float x, float y, const wchar_t* text, int color) {
         imguiColor,
         utf8Text.c_str()
     );
+}
+
+bool WorldToScreen(const float* worldPos, float* screenPos, const float* viewMatrix, int screenWidth, int screenHeight) {
+    float w = viewMatrix[3] * worldPos[0] + viewMatrix[7] * worldPos[1] + viewMatrix[11] * worldPos[2] + viewMatrix[15];
+    if (w < 0.1f) return false;
+
+    screenPos[0] = (viewMatrix[0] * worldPos[0] + viewMatrix[4] * worldPos[1] + viewMatrix[8] * worldPos[2] + viewMatrix[12]) / w;
+    screenPos[1] = (viewMatrix[1] * worldPos[0] + viewMatrix[5] * worldPos[1] + viewMatrix[9] * worldPos[2] + viewMatrix[13]) / w;
+
+    screenPos[0] = (screenWidth / 2.0f) + (screenWidth / 2.0f) * screenPos[0];
+    screenPos[1] = (screenHeight / 2.0f) - (screenHeight / 2.0f) * screenPos[1];
+
+    return true;
+}
+
+
+void RenderESP(const std::vector<Entity>& entities, const float* viewMatrix, int screenWidth, int screenHeight) {
+    for (const auto& entity : entities) {
+        if (entity.health <= 0) continue;
+
+        float screenPos[2];
+        if (WorldToScreen(entity.position, screenPos, viewMatrix, screenWidth, screenHeight)) {
+            // Draw box around entity
+            DrawBox(screenPos[0] - 25, screenPos[1] - 50, 50, 100, 0xFF0000); // Example dimensions and color
+            // Draw health bar
+            DrawBox(screenPos[0] - 30, screenPos[1] - 50, 5, 100 * (entity.health / 100.0f), 0x00FF00);
+        }
+    }
 }

@@ -2,7 +2,26 @@
 #include "../include/ProcessManager.h"  // For ProcessMgr
 #include "../include/MemoryManager.h"   // For memory operations
 #include "../include/Renderer.h"        // For rendering ESP
+#include "../include/Entity.h"
 #include <iostream>
+#include <vector>
+
+std::vector<Entity> GetEntities(DWORD64 entityListAddress, int maxEntities) {
+    std::vector<Entity> entities;
+    for (int i = 0; i < maxEntities; ++i) {
+        DWORD64 entityAddress = MemoryManager::Read<DWORD64>(entityListAddress + i * sizeof(DWORD64));
+        if (entityAddress == 0) continue;
+
+        Entity entity;
+        entity.address = entityAddress;
+        entity.team = MemoryManager::Read<int>(entityAddress + 0x3E3); // Replace with actual offset
+        entity.health = MemoryManager::Read<int>(entityAddress + 0x344); // Replace with actual offset
+        MemoryManager::Read(entityAddress + 0x88, &entity.position, sizeof(entity.position)); // Replace with actual offset
+
+        entities.push_back(entity);
+    }
+    return entities;
+}
 
 bool CGame::InitAddress() {
     // Fetch ClientDLL base address
@@ -27,28 +46,18 @@ bool CGame::InitAddress() {
 }
 
 void CGame::Run() {
-    if (!Initialize()) {
-        std::wcerr << L"[ERROR] Initialization failed. Exiting..." << std::endl;
-        return;
-    }
-
-    std::wcout << L"[INFO] Game loop running with ESP..." << std::endl;
-
-    // Main game loop
     while (isRunning) {
-        if (!ProcessInput()) {
-            isRunning = false; // Stop the loop on input
-        }
+        if (!isESPEnabled) continue;
 
-        if (isESPEnabled) {
-            DrawESP();
-        }
+        std::vector<Entity> entities = GetEntities();
 
-        Update();
-        Render();
+        // Fetch view matrix
+        float viewMatrix[16];
+        MemoryManager::Read(Address.ClientDLL + 0x1A7F610, &viewMatrix, sizeof(viewMatrix)); // Replace with your view matrix offset
+
+        // Render ESP
+        Renderer::RenderESP(entities, viewMatrix, 1920, 1080); // Replace with your screen resolution
     }
-
-    Cleanup();
 }
 
 bool CGame::Initialize() {
