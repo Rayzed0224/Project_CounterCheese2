@@ -2,6 +2,7 @@
 #include "../include/ProcessManager.h"  // For ProcessMgr
 #include "../include/MemoryManager.h"   // For memory operations
 #include "../include/Renderer.h"        // For rendering ESP
+#include <iostream>
 
 bool CGame::InitAddress() {
     // Fetch ClientDLL base address
@@ -14,6 +15,12 @@ bool CGame::InitAddress() {
     // Initialize key offsets (replace these with YOUR offsets)
     this->Address.EntityList = this->Address.ClientDLL + 0x1A146E8; // Replace with your EntityList offset
     this->Address.LocalPlayer = this->Address.ClientDLL + 0x1868CC8; // Replace with your LocalPlayer offset
+
+    // Validate calculated addresses
+    if (Address.EntityList == 0 || Address.LocalPlayer == 0) {
+        std::wcerr << L"[ERROR] Calculated addresses are invalid. Exiting..." << std::endl;
+        return false;
+    }
 
     std::wcout << L"[INFO] Game addresses initialized successfully!" << std::endl;
     return true;

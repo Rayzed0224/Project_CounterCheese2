@@ -1,12 +1,16 @@
 #include "../include/Renderer.h"
 #include "../imgui/backends/imgui_impl_dx11.h"  // Ensure ImGui is properly set up
 #include "../imgui/imgui.h"
+#include "../include/MemoryManager.h"
+#include "../include/CGame.h"
 #include <d3d11.h>  // DirectX 11 header
 #include <windows.h>
 #include <string>
 
 extern ID3D11Device* g_pd3dDevice;          // DirectX device
 extern ID3D11DeviceContext* g_pd3dContext; // DirectX device context
+
+
 
 void Renderer::DrawBox(float x, float y, float width, float height, int color) {
     // Convert color to ImGui format

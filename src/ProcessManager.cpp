@@ -4,6 +4,8 @@
 
 ProcessManager ProcessMgr;
 
+HANDLE hProcess = nullptr; // Global process handle
+
 StatusCode ProcessManager::Attach(const std::wstring& processName) {
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (hSnapshot == INVALID_HANDLE_VALUE) {
