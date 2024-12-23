@@ -33,7 +33,6 @@ bool ImGuiManager::InitDirectX(HWND hwnd) {
         return false;
     }
 
-    // Create render target view
     ID3D11Texture2D* backBuffer = nullptr;
     hr = swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
     if (FAILED(hr)) {
@@ -48,24 +47,22 @@ bool ImGuiManager::InitDirectX(HWND hwnd) {
         return false;
     }
 
-    std::wcout << L"[INFO] DirectX initialized successfully." << std::endl;
-
     RECT rect;
     GetClientRect(hwnd, &rect);
     FLOAT width = rect.right - rect.left;
     FLOAT height = rect.bottom - rect.top;
 
     D3D11_VIEWPORT vp = {};
-    vp.TopLeftX = 0;
-    vp.TopLeftY = 0;
+    vp.TopLeftX = 0.0f;
+    vp.TopLeftY = 0.0f;
     vp.Width = width;
     vp.Height = height;
     vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
 
     g_pd3dContext->RSSetViewports(1, &vp);
-    std::wcout << L"[DEBUG] Viewport set to: " << width << "x" << height << std::endl;
 
+    std::wcout << L"[DEBUG] DirectX initialized with viewport: " << width << "x" << height << std::endl;
     return true;
 }
 
