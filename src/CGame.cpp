@@ -76,7 +76,7 @@ void CGame::SetESPState(bool state) {
 // Main game loop
 void CGame::Run(MemoryManager& memMgr) {
     ImGuiManager imguiManager;
-    std::wcerr << L"[Info] Calling run" << std::endl;
+    
 
     // Initialize ImGuiManager
     if (!imguiManager.Initialize()) {
@@ -86,11 +86,25 @@ void CGame::Run(MemoryManager& memMgr) {
 
     try {
         while (isRunning) {
-            std::wcout << L"[DEBUG] New frame started." << std::endl;
+            if (!g_mainRenderTargetView) {
+                std::wcerr << L"[ERROR] Render target view is null!" << std::endl;
+                return;
+            }
+
+            // Clear the render target
+            FLOAT clearColor[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
+            g_pd3dContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
+            g_pd3dContext->ClearRenderTargetView(g_mainRenderTargetView, clearColor);
 
             imguiManager.BeginFrame();
             imguiManager.RenderUI(*this);
             imguiManager.EndFrame();
+
+            // Present the frame
+            HRESULT hr = swapChain->Present(1, 0);
+            if (FAILED(hr)) {
+                std::wcerr << L"[ERROR] Swap chain present failed with HRESULT: " << std::hex << hr << std::endl;
+            }
 
             if (isESPEnabled) {
                 std::vector<Entity> entities = GetEntities(memMgr, this->Address.EntityList, 64);

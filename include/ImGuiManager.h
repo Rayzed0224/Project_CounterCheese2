@@ -17,4 +17,7 @@ public:
     void RenderUI(CGame& game);     // Render ImGui UI elements
     void EndFrame();     // End the ImGui frame and render
     void Cleanup();      // Cleanup ImGui resources
+
+private:
+    bool InitDirectX(HWND hwnd); // Declare InitDirectX here
 };
