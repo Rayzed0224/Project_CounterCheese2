@@ -18,6 +18,12 @@ public:
     // Get the base address of a module in the attached process
     DWORD64 GetProcessModuleHandle(const std::wstring& moduleName);
 
+    // Getter for hProcess
+    HANDLE GetProcessHandle() const { return hProcess; }
+
+    // Getter for process ID
+    DWORD GetProcessID() const { return processID; }
+
 private:
     HANDLE hProcess = nullptr;  // Handle to the attached process
     DWORD processID = 0;        // ID of the attached process

@@ -3,61 +3,117 @@
 #include "../include/MemoryManager.h"   // For memory operations
 #include "../include/Renderer.h"        // For rendering ESP
 #include "../include/Entity.h"
+#include "../include/Offsets.h"
+#include "../include/ImGuiManager.h"
 #include <iostream>
 #include <vector>
 
-std::vector<Entity> GetEntities(DWORD64 entityListAddress, int maxEntities) {
+
+std::vector<Entity> GetEntities(MemoryManager& memMgr, DWORD64 entityListAddress, int maxEntities) {
     std::vector<Entity> entities;
     for (int i = 0; i < maxEntities; ++i) {
-        DWORD64 entityAddress = MemoryManager::Read<DWORD64>(entityListAddress + i * sizeof(DWORD64));
-        if (entityAddress == 0) continue;
+        DWORD64 entityAddress;
+        if (!memMgr.Read(entityListAddress + i * sizeof(DWORD64), &entityAddress, sizeof(DWORD64)) || entityAddress == 0) {
+            continue;
+        }
 
         Entity entity;
         entity.address = entityAddress;
-        entity.team = MemoryManager::Read<int>(entityAddress + 0x3E3); // Replace with actual offset
-        entity.health = MemoryManager::Read<int>(entityAddress + 0x344); // Replace with actual offset
-        MemoryManager::Read(entityAddress + 0x88, &entity.position, sizeof(entity.position)); // Replace with actual offset
+
+        int team, health;
+        if (!memMgr.Read(entityAddress + m_iTeamNum, &team, sizeof(int)) ||
+            !memMgr.Read(entityAddress + m_iHealth, &health, sizeof(int))) {
+            continue;
+        }
+
+        entity.team = team;
+        entity.health = health;
+
+        if (!memMgr.Read(entityAddress + m_vecOrigin, &entity.position, sizeof(entity.position))) {
+            continue;
+        }
 
         entities.push_back(entity);
     }
     return entities;
 }
 
-bool CGame::InitAddress() {
-    // Fetch ClientDLL base address
+
+// Initialize memory addresses
+bool CGame::InitAddress(MemoryManager& memMgr) {
+    DWORD processID = ProcessMgr.GetProcessID();
+    if (processID == 0) {
+        std::wcerr << L"[ERROR] Failed to retrieve process ID." << std::endl;
+        return false;
+    }
+
+    if (!memMgr.Attach(processID)) {
+        std::wcerr << L"[ERROR] Failed to attach to process ID: " << processID << std::endl;
+        return false;
+    }
+
     this->Address.ClientDLL = ProcessMgr.GetProcessModuleHandle(L"client.dll");
     if (this->Address.ClientDLL == 0) {
         std::wcerr << L"[ERROR] Failed to locate client.dll. Exiting..." << std::endl;
         return false;
     }
 
-    // Initialize key offsets (replace these with YOUR offsets)
-    this->Address.EntityList = this->Address.ClientDLL + 0x1A146E8; // Replace with your EntityList offset
-    this->Address.LocalPlayer = this->Address.ClientDLL + 0x1868CC8; // Replace with your LocalPlayer offset
+    this->Address.EntityList = this->Address.ClientDLL + dwEntityList;
+    this->Address.LocalPlayer = this->Address.ClientDLL + dwLocalPlayer;
+    this->Address.ViewMatrix = this->Address.ClientDLL + dwViewMatrix;
 
-    // Validate calculated addresses
-    if (Address.EntityList == 0 || Address.LocalPlayer == 0) {
-        std::wcerr << L"[ERROR] Calculated addresses are invalid. Exiting..." << std::endl;
-        return false;
-    }
-
-    std::wcout << L"[INFO] Game addresses initialized successfully!" << std::endl;
+    std::wcout << L"[INFO] Addresses initialized successfully!" << std::endl;
     return true;
 }
 
-void CGame::Run() {
-    while (isRunning) {
-        if (!isESPEnabled) continue;
+void CGame::SetESPState(bool state) {
+    isESPEnabled = state;
+    std::wcout << L"[INFO] ESP state set to: " << (isESPEnabled ? L"Enabled" : L"Disabled") << std::endl;
+}
 
-        std::vector<Entity> entities = GetEntities();
 
-        // Fetch view matrix
-        float viewMatrix[16];
-        MemoryManager::Read(Address.ClientDLL + 0x1A7F610, &viewMatrix, sizeof(viewMatrix)); // Replace with your view matrix offset
 
-        // Render ESP
-        Renderer::RenderESP(entities, viewMatrix, 1920, 1080); // Replace with your screen resolution
+// Main game loop
+void CGame::Run(MemoryManager& memMgr) {
+    ImGuiManager imguiManager;
+    std::wcerr << L"[Info] Calling run" << std::endl;
+
+    // Initialize ImGuiManager
+    if (!imguiManager.Initialize()) {
+        std::wcerr << L"[ERROR] Failed to initialize ImGuiManager." << std::endl;
+        return;
     }
+
+    try {
+        while (isRunning) {
+            std::wcout << L"[DEBUG] New frame started." << std::endl;
+
+            imguiManager.BeginFrame();
+            imguiManager.RenderUI(*this);
+            imguiManager.EndFrame();
+
+            if (isESPEnabled) {
+                std::vector<Entity> entities = GetEntities(memMgr, this->Address.EntityList, 64);
+
+                float viewMatrix[16];
+                if (!memMgr.Read(this->Address.ViewMatrix, viewMatrix, sizeof(viewMatrix))) {
+                    std::wcerr << L"[ERROR] Failed to read view matrix." << std::endl;
+                    continue;
+                }
+
+                Renderer::RenderESP(entities, viewMatrix, 1920, 1080);
+                std::wcout << L"[DEBUG] ESP rendered." << std::endl;
+            }
+
+            swapChain->Present(1, 0);
+            std::wcout << L"[DEBUG] Frame presented." << std::endl;
+        }
+    }
+    catch (const std::exception& e) {
+        std::wcerr << L"[ERROR] Exception caught: " << e.what() << std::endl;
+    }
+    imguiManager.Cleanup();
+    std::wcout << L"[INFO] Run method exited." << std::endl;
 }
 
 bool CGame::Initialize() {
@@ -79,39 +135,54 @@ bool CGame::ProcessInput() {
     return true;
 }
 
-void CGame::DrawESP() {
-    DWORD64 entityList = this->Address.EntityList;
-    DWORD64 localPlayer = this->Address.LocalPlayer;
+void CGame::DrawESP(MemoryManager& memMgr) {
+    for (int i = 0; i < 64; ++i) {
+        DWORD64 entityAddress;
+        if (!memMgr.Read(this->Address.EntityList + i * sizeof(DWORD64), &entityAddress, sizeof(DWORD64)) || entityAddress == 0) {
+            continue;
+        }
 
-    for (int i = 0; i < 64; ++i) { // Loop through entities
-        DWORD64 entity = MemoryManager::Read<DWORD64>(entityList + i * 0x10);
+        int health;
+        if (!memMgr.Read(entityAddress + m_iHealth, &health, sizeof(int)) || health <= 0) {
+            continue;
+        }
 
-        if (entity == 0) continue; // Skip invalid entities
+        float position[3];
+        if (!memMgr.Read(entityAddress + m_vecOrigin, position, sizeof(position))) {
+            continue;
+        }
 
-        int health = MemoryManager::Read<int>(entity + 100); // Replace with your health offset
-        if (health <= 0) continue;
-
-        float posX = MemoryManager::Read<float>(entity + 308); // Replace with your position offsets
-        float posY = MemoryManager::Read<float>(entity + 312);
-        float posZ = MemoryManager::Read<float>(entity + 316);
-
-        // Render ESP box
-        Renderer::DrawBox(posX, posY, 50, 100, health);
+        Renderer::DrawBox(position[0], position[1], 50, 100, health);
     }
 }
 
-void CGame::Update() {
-    const int MAX_ENTITIES = 128; // Example max entities, replace with actual value
+
+void CGame::Update(MemoryManager& memMgr) {
+    const int MAX_ENTITIES = 128; // Replace with actual max entities
     const DWORD64 entityBaseOffset = 0x10; // Replace with actual offset
 
+    std::cout << "[DEBUG] Updating entities..." << std::endl;
     for (int index = 0; index < MAX_ENTITIES; ++index) {
-        DWORD64 entityAddress = MemoryManager::Read<DWORD64>(Address.EntityList + (index * entityBaseOffset));
-        int health = MemoryManager::Read<int>(entityAddress + 0x20); // Replace 0x20 with health offset
-        float xPos = MemoryManager::Read<float>(entityAddress + 0x50); // Replace 0x50 with X position offset
+        DWORD64 entityAddress;
+        if (!memMgr.Read(this->Address.EntityList + (index * entityBaseOffset), &entityAddress, sizeof(DWORD64)) || entityAddress == 0) {
+            continue;
+        }
 
-        std::cout << "Entity " << index << ": Health = " << health << ", Position X = " << xPos << std::endl;
+        int health;
+        if (!memMgr.Read(entityAddress + m_iHealth, &health, sizeof(int)) || health <= 0) {
+            continue;
+        }
+
+        float position[3];
+        if (!memMgr.Read(entityAddress + m_vecOrigin, position, sizeof(position))) {
+            continue;
+        }
+
+        std::cout << "Entity " << index << ": Health = " << health
+            << ", Position = [" << position[0] << ", " << position[1] << ", " << position[2] << "]" << std::endl;
     }
 }
+
 
 void CGame::Render() {
     // Placeholder for rendering additional visuals

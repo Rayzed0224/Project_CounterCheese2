@@ -4,6 +4,7 @@
 #include "../include/MemoryManager.h"
 #include "../include/CGame.h"
 #include "../include/Entity.h"
+#include "../include/Offsets.h"
 #include <d3d11.h>  // DirectX 11 header
 #include <windows.h>
 #include <string>
@@ -13,7 +14,11 @@
 extern ID3D11Device* g_pd3dDevice;          // DirectX device
 extern ID3D11DeviceContext* g_pd3dContext; // DirectX device context
 
+// Declare external Address instance from CGame
+extern CGame::Addresses Address;
 
+// Local player team variable
+int localPlayerTeam = 0;
 
 void Renderer::DrawBox(float x, float y, float width, float height, int color) {
     // Convert color to ImGui format
@@ -82,16 +87,19 @@ bool WorldToScreen(const float* worldPos, float* screenPos, const float* viewMat
     return true;
 }
 
-
-void RenderESP(const std::vector<Entity>& entities, const float* viewMatrix, int screenWidth, int screenHeight) {
+void Renderer::RenderESP(const std::vector<Entity>& entities, const float* viewMatrix, int screenWidth, int screenHeight) {
     for (const auto& entity : entities) {
-        if (entity.health <= 0) continue;
+        if (entity.health <= 0) continue; // Skip dead entities
+
+        // Skip teammates
+        if (entity.team == localPlayerTeam) continue;
 
         float screenPos[2];
         if (WorldToScreen(entity.position, screenPos, viewMatrix, screenWidth, screenHeight)) {
-            // Draw box around entity
-            DrawBox(screenPos[0] - 25, screenPos[1] - 50, 50, 100, 0xFF0000); // Example dimensions and color
-            // Draw health bar
+            // Draw a red box for enemies
+            DrawBox(screenPos[0] - 25, screenPos[1] - 50, 50, 100, 0xFF0000);
+
+            // Draw a green health bar
             DrawBox(screenPos[0] - 30, screenPos[1] - 50, 5, 100 * (entity.health / 100.0f), 0x00FF00);
         }
     }
