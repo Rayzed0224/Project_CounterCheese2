@@ -26,12 +26,30 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
-HWND CreateOverlayWindow(HINSTANCE hInstance) {
+HWND CreateOverlayWindow(HINSTANCE hInstance, HWND gameWindow) {
+    RECT gameRect;
+    if (!GetWindowRect(gameWindow, &gameRect)) {
+        std::wcerr << L"[ERROR] Failed to retrieve game window dimensions." << std::endl;
+        return nullptr;
+    }
+
     WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, hInstance, NULL, NULL, NULL, NULL, _T("Overlay"), NULL };
     RegisterClassEx(&wc);
 
-    HWND hwnd = CreateWindowEx(WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT, wc.lpszClassName, _T("External Overlay"),
-        WS_POPUP, 0, 0, 1920, 1080, NULL, NULL, wc.hInstance, NULL);
+    HWND hwnd = CreateWindowEx(
+        WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT,
+        wc.lpszClassName,
+        _T("External Overlay"),
+        WS_POPUP,
+        gameRect.left,
+        gameRect.top,
+        gameRect.right - gameRect.left,
+        gameRect.bottom - gameRect.top,
+        NULL,
+        NULL,
+        wc.hInstance,
+        NULL
+    );
 
     SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 255, LWA_COLORKEY);
     ShowWindow(hwnd, SW_SHOWDEFAULT);
@@ -40,49 +58,77 @@ HWND CreateOverlayWindow(HINSTANCE hInstance) {
     return hwnd;
 }
 
+// Continuously align the overlay in the game loop
+void AlignOverlayWithGame(HWND overlayWindow, HWND gameWindow) {
+    RECT gameRect;
+    if (GetWindowRect(gameWindow, &gameRect)) {
+        SetWindowPos(
+            overlayWindow, HWND_TOPMOST,
+            gameRect.left, gameRect.top,
+            gameRect.right - gameRect.left,
+            gameRect.bottom - gameRect.top,
+            SWP_NOACTIVATE | SWP_NOSENDCHANGING
+        );
+    }
+    else {
+        std::wcerr << L"[ERROR] Failed to get game window dimensions." << std::endl;
+    }
+}
+
 int main() {
     
     // Create the overlay window
-    HINSTANCE hInstance = GetModuleHandle(NULL);
-    HWND overlayWindow = CreateOverlayWindow(hInstance);
+    
+    HWND gameWindow = FindWindow(nullptr, L"Counter-Strike 2");
+    if (!gameWindow) {
+        std::wcerr << L"[ERROR] Failed to find game window." << std::endl;
+        return -1;
+    }
+
+    HWND overlayWindow = CreateOverlayWindow(GetModuleHandle(NULL), gameWindow);
     if (!overlayWindow) {
-        std::cerr << "[ERROR] Failed to create overlay window." << std::endl;
+        std::wcerr << L"[ERROR] Failed to create overlay window." << std::endl;
         return -1;
     }
 
     // Attach to the game
-    auto processStatus = ProcessMgr.Attach(L"cs2.exe");
-    if (processStatus != StatusCode::SUCCEED) {
-        std::wcerr << L"[ERROR] Failed to attach to the process 'cs2.exe'. StatusCode: " << static_cast<int>(processStatus) << std::endl;
-        return -1;
-    }
+        auto processStatus = ProcessMgr.Attach(L"cs2.exe");
+        if (processStatus != StatusCode::SUCCEED) {
+            std::wcerr << L"[ERROR] Failed to attach to the process 'cs2.exe'. StatusCode: " << static_cast<int>(processStatus) << std::endl;
+            return -1;
+        }
 
-    // Create the game instance
-    CGame game;
+        // Create the game instance
+        CGame game;
 
-    // Create a MemoryManager instance
-    MemoryManager memMgr;
+        // Create a MemoryManager instance
+        MemoryManager memMgr;
 
-    ImGuiManager imguiManager;
+        ImGuiManager imguiManager;
 
-    // Step 2: Initialize ImGui for rendering UI
-    /*if (!imguiManager.Initialize()) {
-        std::wcerr << L"[ERROR] Failed to initialize ImGui." << std::endl;
-        return -1;
-    }*/
+        // Step 2: Initialize ImGui for rendering UI
+        if (!imguiManager.Initialize()) {
+            std::wcerr << L"[ERROR] Failed to initialize ImGui." << std::endl;
+            return -1;
+        }
 
-    // Step 3: Initialize addresses and memory
-    if (!game.InitAddress(memMgr)) {
-        std::wcerr << L"[ERROR] Failed to initialize game addresses." << std::endl;
-        return -1;
-    }
+        // Step 3: Initialize addresses and memory
+        if (!game.InitAddress(memMgr)) {
+            std::wcerr << L"[ERROR] Failed to initialize game addresses." << std::endl;
+            return -1;
+        }
 
-    // Step 4: Run the main game loop
-    game.Run(memMgr, overlayWindow);
+        // Step 4: Run the main game loop
+        while (game.IsRunning()) {
+            AlignOverlayWithGame(overlayWindow, gameWindow);
 
-    // Step 5: Cleanup resources
-    imguiManager.Cleanup();
+            // Run the game loop
+            game.Run(memMgr, overlayWindow);
+        }
 
-    std::wcout << L"[INFO] Exiting application." << std::endl;
-    return 0;
+        // Step 5: Cleanup resources
+        imguiManager.Cleanup();
+
+        std::wcout << L"[INFO] Exiting application." << std::endl;
+        return 0;
 }

@@ -7,6 +7,15 @@
 
 class CGame {
 public:
+
+    CGame() : isRunning(true), isESPEnabled(true) {}
+    void ProcessInput();
+
+    void Run(MemoryManager& memMgr, HWND overlayWindow);;
+    void SetESPState(bool state);
+    bool IsRunning() const { return isRunning; }
+    void Stop() { isRunning = false; }
+
     bool InitAddress(MemoryManager& memMgr); // Initialize game memory addresses
     bool Initialize();      // General initialization
     bool ProcessInput();    // Handle user input
@@ -23,15 +32,11 @@ public:
         DWORD64 ViewMatrix = 0;
     };
 
-    bool isRunning = true;          // Is the game loop running
-    
-
-    void Run(MemoryManager& memMgr, HWND overlayWindow); // Main game loop
-
     Addresses Address;
 
 private:
-    bool isESPEnabled = true;       // Is ESP enabled
+    bool isESPEnabled;       // Is ESP enabled
+    bool isRunning;
 };
 
 

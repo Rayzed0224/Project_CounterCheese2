@@ -80,6 +80,16 @@ void AlignOverlayWithGame(HWND overlayWindow, HWND gameWindow) {
         SWP_NOACTIVATE | SWP_NOSENDCHANGING);
 }
 
+void CGame::ProcessInput() {
+    if (GetAsyncKeyState(VK_F1) & 0x1) { // Toggle ESP with F1
+        SetESPState(!isESPEnabled);
+    }
+
+    if (GetAsyncKeyState(VK_ESCAPE) & 0x1) { // Stop game loop with Escape
+        Stop();
+    }
+}
+
 
 // Main game loop
 void CGame::Run(MemoryManager& memMgr, HWND overlayWindow) {
@@ -102,8 +112,8 @@ void CGame::Run(MemoryManager& memMgr, HWND overlayWindow) {
         }
 
         // Clear screen
-        FLOAT clearColor[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
         g_pd3dContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
+        FLOAT clearColor[4] = { 0.1f, 0.1f, 0.1f, 1.0f }; // Dark gray
         g_pd3dContext->ClearRenderTargetView(g_mainRenderTargetView, clearColor);
 
         // ImGui rendering
@@ -116,14 +126,14 @@ void CGame::Run(MemoryManager& memMgr, HWND overlayWindow) {
         std::wcout << L"[DEBUG] Ending ImGui frame." << std::endl;
         imguiManager.EndFrame();
 
+        ProcessInput();
+
         // Present frame
         HRESULT hr = swapChain->Present(1, 0);
         if (FAILED(hr)) {
             std::wcerr << L"[ERROR] Swap chain present failed with HRESULT: " << std::hex << hr << std::endl;
             break;
         }
-
-        if (!isRunning) break; // Exit if loop flag is false
     }
 
     imguiManager.Cleanup();
@@ -132,20 +142,6 @@ void CGame::Run(MemoryManager& memMgr, HWND overlayWindow) {
 
 bool CGame::Initialize() {
     std::wcout << L"[INFO] Initializing game components..." << std::endl;
-    return true;
-}
-
-bool CGame::ProcessInput() {
-    if (GetAsyncKeyState(VK_F1)) {
-        std::wcout << L"[INFO] Toggling ESP on/off." << std::endl;
-        isESPEnabled = !isESPEnabled;
-    }
-
-    if (GetAsyncKeyState(VK_ESCAPE)) {
-        std::wcout << L"[INFO] Escape key pressed. Exiting game loop." << std::endl;
-        return false;
-    }
-
     return true;
 }
 

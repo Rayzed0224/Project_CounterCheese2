@@ -48,36 +48,31 @@ bool ImGuiManager::InitDirectX(HWND hwnd) {
     }
 
     RECT rect;
-    if (GetClientRect(hwnd, &rect)) {
-        std::wcout << L"[DEBUG] Window dimensions: "
-            << (rect.right - rect.left) << "x" << (rect.bottom - rect.top) << std::endl;
-    }
-    else {
-        std::wcerr << L"[ERROR] GetClientRect failed. Error code: " << GetLastError() << std::endl;
-        rect.right = rect.left + 1920; // Default fallback
-        rect.bottom = rect.top + 1080;
+    if (!GetClientRect(hwnd, &rect)) {
+        std::wcerr << L"[ERROR] Failed to get client rectangle for hwnd." << std::endl;
+        rect.right = 1920;
+        rect.bottom = 1080;
     }
 
-    FLOAT width = static_cast<FLOAT>(rect.right - rect.left);
-    FLOAT height = static_cast<FLOAT>(rect.bottom - rect.top);
+    FLOAT width = rect.right - rect.left;
+    FLOAT height = rect.bottom - rect.top;
 
     if (width <= 0 || height <= 0) {
-        std::wcerr << L"[ERROR] Invalid viewport dimensions. Setting default." << std::endl;
+        std::wcerr << L"[ERROR] Invalid viewport dimensions, falling back to defaults." << std::endl;
         width = 1920.0f;
         height = 1080.0f;
     }
 
-    D3D11_VIEWPORT viewport = {};
-    viewport.Width = (float)GetSystemMetrics(SM_CXSCREEN); // Full screen width
-    viewport.Height = (float)GetSystemMetrics(SM_CYSCREEN); // Full screen height
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-    viewport.TopLeftX = 0;
-    viewport.TopLeftY = 0;
+    D3D11_VIEWPORT vp = {};
+    vp.TopLeftX = 0.0f;
+    vp.TopLeftY = 0.0f;
+    vp.Width = width;
+    vp.Height = height;
+    vp.MinDepth = 0.0f;
+    vp.MaxDepth = 1.0f;
 
-    g_pd3dContext->RSSetViewports(1, &viewport);
-
-    std::wcout << L"[DEBUG] DirectX initialized with viewport: " << width << "x" << height << std::endl;
+    g_pd3dContext->RSSetViewports(1, &vp);
+    std::wcout << L"[DEBUG] Viewport dimensions set: " << width << "x" << height << std::endl;
     return true;
 }
 

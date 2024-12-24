@@ -18,7 +18,7 @@ void MemoryManager::Detach() {
 
 bool MemoryManager::Read(DWORD64 address, void* buffer, SIZE_T size) {
     if (!hProcess || !buffer || address == 0) {
-        std::cerr << "[ERROR] Invalid parameters for memory read." << std::endl;
+        std::cerr << "[ERROR] Invalid parameters for memory read. Address: 0x" << std::hex << address << std::endl;
         return false;
     }
 
