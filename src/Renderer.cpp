@@ -91,16 +91,9 @@ void Renderer::RenderESP(const std::vector<Entity>& entities, const float* viewM
     for (const auto& entity : entities) {
         if (entity.health <= 0) continue; // Skip dead entities
 
-        // Skip teammates
-        if (entity.team == localPlayerTeam) continue;
-
         float screenPos[2];
         if (WorldToScreen(entity.position, screenPos, viewMatrix, screenWidth, screenHeight)) {
-            // Draw a red box for enemies
-            DrawBox(screenPos[0] - 25, screenPos[1] - 50, 50, 100, 0xFF0000);
-
-            // Draw a green health bar
-            DrawBox(screenPos[0] - 30, screenPos[1] - 50, 5, 100 * (entity.health / 100.0f), 0x00FF00);
+            DrawBox(screenPos[0] - 25, screenPos[1] - 50, 50, 100, 0xFF0000); // Red box for enemies
         }
     }
 }

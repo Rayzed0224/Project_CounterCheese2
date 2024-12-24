@@ -48,46 +48,66 @@ bool ImGuiManager::InitDirectX(HWND hwnd) {
     }
 
     RECT rect;
-    GetClientRect(hwnd, &rect);
-    FLOAT width = rect.right - rect.left;
-    FLOAT height = rect.bottom - rect.top;
+    if (GetClientRect(hwnd, &rect)) {
+        std::wcout << L"[DEBUG] Window dimensions: "
+            << (rect.right - rect.left) << "x" << (rect.bottom - rect.top) << std::endl;
+    }
+    else {
+        std::wcerr << L"[ERROR] GetClientRect failed. Error code: " << GetLastError() << std::endl;
+        rect.right = rect.left + 1920; // Default fallback
+        rect.bottom = rect.top + 1080;
+    }
 
-    D3D11_VIEWPORT vp = {};
-    vp.TopLeftX = 0.0f;
-    vp.TopLeftY = 0.0f;
-    vp.Width = width;
-    vp.Height = height;
-    vp.MinDepth = 0.0f;
-    vp.MaxDepth = 1.0f;
+    FLOAT width = static_cast<FLOAT>(rect.right - rect.left);
+    FLOAT height = static_cast<FLOAT>(rect.bottom - rect.top);
 
-    g_pd3dContext->RSSetViewports(1, &vp);
+    if (width <= 0 || height <= 0) {
+        std::wcerr << L"[ERROR] Invalid viewport dimensions. Setting default." << std::endl;
+        width = 1920.0f;
+        height = 1080.0f;
+    }
+
+    D3D11_VIEWPORT viewport = {};
+    viewport.Width = (float)GetSystemMetrics(SM_CXSCREEN); // Full screen width
+    viewport.Height = (float)GetSystemMetrics(SM_CYSCREEN); // Full screen height
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+    viewport.TopLeftX = 0;
+    viewport.TopLeftY = 0;
+
+    g_pd3dContext->RSSetViewports(1, &viewport);
 
     std::wcout << L"[DEBUG] DirectX initialized with viewport: " << width << "x" << height << std::endl;
     return true;
 }
 
-bool ImGuiManager::Initialize() {
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
-
-    HWND hwnd = FindWindow(nullptr, L"Counter-Strike 2");
-    if (!hwnd) {
-        std::wcerr << L"[ERROR] Failed to find game window." << std::endl;
+bool ImGuiManager::Initialize(HWND overlayWindow) {
+    // Validate overlay window
+    if (!overlayWindow) {
+        std::wcerr << L"[ERROR] Overlay window handle is invalid." << std::endl;
         return false;
     }
 
-    if (!InitDirectX(hwnd)) {
+    // Initialize DirectX
+    if (!InitDirectX(overlayWindow)) {
         std::wcerr << L"[ERROR] Failed to initialize DirectX." << std::endl;
         return false;
     }
+    std::wcout << L"[DEBUG] DirectX initialized successfully." << std::endl;
 
-    if (!ImGui_ImplWin32_Init(hwnd) || !ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dContext)) {
+    // Initialize ImGui
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    std::wcout << L"[DEBUG] ImGui context created." << std::endl;
+
+    // Initialize ImGui backends
+    if (!ImGui_ImplWin32_Init(overlayWindow) || !ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dContext)) {
         std::wcerr << L"[ERROR] Failed to initialize ImGui backends." << std::endl;
         return false;
     }
-
     std::wcout << L"[INFO] ImGui initialized successfully." << std::endl;
+
     return true;
 }
 
@@ -98,10 +118,7 @@ void ImGuiManager::BeginFrame() {
 }
 
 void ImGuiManager::RenderUI(CGame& game) {
-    ImGui::SetNextWindowFocus();
-    ImGui::SetNextWindowPos(ImVec2(200, 200), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_Always);
-    std::wcout << L"[INFO] ImGui" << std::endl;
+    
     ImGui::Begin("Debug Menu");
     ImGui::Text("Test Window - If you can see this, ImGui is working.");
 
@@ -126,7 +143,6 @@ void ImGuiManager::EndFrame() {
     }
     ImGui_ImplDX11_RenderDrawData(drawData);
 }
-
 
 void ImGuiManager::Cleanup() {
     ImGui_ImplDX11_Shutdown();

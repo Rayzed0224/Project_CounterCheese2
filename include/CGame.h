@@ -26,7 +26,7 @@ public:
     bool isRunning = true;          // Is the game loop running
     
 
-    void Run(MemoryManager& memMgr); // Main game loop
+    void Run(MemoryManager& memMgr, HWND overlayWindow); // Main game loop
 
     Addresses Address;
 

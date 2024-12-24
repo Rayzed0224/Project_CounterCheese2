@@ -12,7 +12,7 @@ extern IDXGISwapChain* swapChain;
 
 class ImGuiManager {
 public:
-    bool Initialize();   // Initialize ImGui
+    bool Initialize(HWND hwnd);   // Initialize ImGui
     void BeginFrame();   // Start a new ImGui frame
     void RenderUI(CGame& game);     // Render ImGui UI elements
     void EndFrame();     // End the ImGui frame and render

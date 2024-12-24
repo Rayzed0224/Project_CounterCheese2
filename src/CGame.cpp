@@ -71,63 +71,63 @@ void CGame::SetESPState(bool state) {
     std::wcout << L"[INFO] ESP state set to: " << (isESPEnabled ? L"Enabled" : L"Disabled") << std::endl;
 }
 
+void AlignOverlayWithGame(HWND overlayWindow, HWND gameWindow) {
+    RECT gameRect;
+    GetWindowRect(gameWindow, &gameRect);
+
+    SetWindowPos(overlayWindow, HWND_TOPMOST, gameRect.left, gameRect.top,
+        gameRect.right - gameRect.left, gameRect.bottom - gameRect.top,
+        SWP_NOACTIVATE | SWP_NOSENDCHANGING);
+}
 
 
 // Main game loop
-void CGame::Run(MemoryManager& memMgr) {
+void CGame::Run(MemoryManager& memMgr, HWND overlayWindow) {
     ImGuiManager imguiManager;
     
 
     // Initialize ImGuiManager
-    if (!imguiManager.Initialize()) {
+    if (!imguiManager.Initialize(overlayWindow)) {
         std::wcerr << L"[ERROR] Failed to initialize ImGuiManager." << std::endl;
         return;
     }
 
-    try {
-        while (isRunning) {
-            if (!g_mainRenderTargetView) {
-                std::wcerr << L"[ERROR] Render target view is null!" << std::endl;
-                return;
-            }
+    while (isRunning) {
+        HWND gameWindow = FindWindow(NULL, L"Counter-Strike 2");
+        AlignOverlayWithGame(overlayWindow, gameWindow);
 
-            // Clear the render target
-            FLOAT clearColor[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
-            g_pd3dContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
-            g_pd3dContext->ClearRenderTargetView(g_mainRenderTargetView, clearColor);
-
-            imguiManager.BeginFrame();
-            imguiManager.RenderUI(*this);
-            imguiManager.EndFrame();
-
-            // Present the frame
-            HRESULT hr = swapChain->Present(1, 0);
-            if (FAILED(hr)) {
-                std::wcerr << L"[ERROR] Swap chain present failed with HRESULT: " << std::hex << hr << std::endl;
-            }
-
-            if (isESPEnabled) {
-                std::vector<Entity> entities = GetEntities(memMgr, this->Address.EntityList, 64);
-
-                float viewMatrix[16];
-                if (!memMgr.Read(this->Address.ViewMatrix, viewMatrix, sizeof(viewMatrix))) {
-                    std::wcerr << L"[ERROR] Failed to read view matrix." << std::endl;
-                    continue;
-                }
-
-                Renderer::RenderESP(entities, viewMatrix, 1920, 1080);
-                std::wcout << L"[DEBUG] ESP rendered." << std::endl;
-            }
-
-            swapChain->Present(1, 0);
-            std::wcout << L"[DEBUG] Frame presented." << std::endl;
+        if (!g_mainRenderTargetView) {
+            std::wcerr << L"[ERROR] Render target view is null. Unable to render." << std::endl;
+            break;
         }
+
+        // Clear screen
+        FLOAT clearColor[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
+        g_pd3dContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
+        g_pd3dContext->ClearRenderTargetView(g_mainRenderTargetView, clearColor);
+
+        // ImGui rendering
+        std::wcout << L"[DEBUG] Starting ImGui frame." << std::endl;
+        imguiManager.BeginFrame();
+
+        std::wcout << L"[DEBUG] Rendering ImGui UI." << std::endl;
+        imguiManager.RenderUI(*this);
+
+        std::wcout << L"[DEBUG] Ending ImGui frame." << std::endl;
+        imguiManager.EndFrame();
+
+        // Present frame
+        HRESULT hr = swapChain->Present(1, 0);
+        if (FAILED(hr)) {
+            std::wcerr << L"[ERROR] Swap chain present failed with HRESULT: " << std::hex << hr << std::endl;
+            break;
+        }
+
+        if (!isRunning) break; // Exit if loop flag is false
     }
-    catch (const std::exception& e) {
-        std::wcerr << L"[ERROR] Exception caught: " << e.what() << std::endl;
-    }
+
     imguiManager.Cleanup();
-    std::wcout << L"[INFO] Run method exited." << std::endl;
+    std::wcout << L"[INFO] Game loop exited successfully." << std::endl;
 }
 
 bool CGame::Initialize() {
